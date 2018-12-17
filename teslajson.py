@@ -15,11 +15,12 @@ v.command('charge_start')
 """
 
 try: # Python 3
-    from urllib.parse import urlencode
+    from urllib.parse import urlencode, urlparse
     from urllib.request import Request, build_opener
     from urllib.request import ProxyHandler, HTTPBasicAuthHandler, HTTPHandler
 except: # Python 2
     from urllib import urlencode
+    from urlparse import urlparse
     from urllib2 import Request, build_opener
     from urllib2 import ProxyHandler, HTTPBasicAuthHandler, HTTPHandler
 import json
@@ -56,7 +57,8 @@ class Connection(object):
         tesla_client = self.__open("/raw/0a8e0xTJ", baseurl="http://pastebin.com")
         current_client = tesla_client['v1']
         self.baseurl = current_client['baseurl']
-        if not self.baseurl.startswith('https:') or not self.baseurl.endswith(('.teslamotors.com','.tesla.com')):
+        parsed = urlparse(self.baseurl)
+        if parsed.scheme != 'https' or not parsed.netloc.endswith(('.teslamotors.com','.tesla.com')):
             raise IOError("Unexpected URL (%s) from pastebin" % self.baseurl)
         self.api = current_client['api']
         if access_token:
