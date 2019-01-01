@@ -32,9 +32,11 @@ class Connection(object):
             email='',
             password='',
             access_token='',
+            token_expiration=float('inf')
             proxy_url = '',
             proxy_user = '',
-            proxy_password = ''):
+            proxy_password = '',
+            token_refresh_lead_time = 24 * 60 * 60):   # How long before expiration do we want to refresh the token. Defaults to 24 hours
         """Initialize connection object
         
         Sets the vehicles field, a list of Vehicle objects
@@ -53,6 +55,7 @@ class Connection(object):
         self.proxy_url = proxy_url
         self.proxy_user = proxy_user
         self.proxy_password = proxy_password
+        self.token_refresh_lead_time = token_refresh_lead_time
         tesla_client = self.__open("/raw/0a8e0xTJ", baseurl="http://pastebin.com")
         current_client = tesla_client['v1']
         self.baseurl = current_client['baseurl']
@@ -60,7 +63,7 @@ class Connection(object):
             raise IOError("Unexpected URL (%s) from pastebin" % self.baseurl)
         self.api = current_client['api']
         if access_token:
-            self.__sethead(access_token)
+            self.__sethead(access_token, token_expiration)
         else:
             self.oauth = {
                 "grant_type" : "password",
@@ -78,10 +81,17 @@ class Connection(object):
     def post(self, command, data={}):
         """Utility command to post data to API"""
         now = calendar.timegm(datetime.datetime.now().timetuple())
-        if now > self.expiration:
+        if now > self.expiration - self.token_refresh_lead_time:
+            if self.access_token != '':     # We already have a token, we need to refresh it
+                self.oauth = {
+                    "grant_type" : "refresh_token",
+                    "client_id" : current_client['id'],
+                    "client_secret" : current_client['secret'],
+                    "refresh_token" : self.access_token }
+                    
             auth = self.__open("/oauth/token", data=self.oauth)
             self.__sethead(auth['access_token'],
-                           auth['created_at'] + auth['expires_in'] - 86400)
+                           auth['created_at'] + auth['expires_in'])
         return self.__open("%s%s" % (self.api, command), headers=self.head, data=data)
     
     def __sethead(self, access_token, expiration=float('inf')):
